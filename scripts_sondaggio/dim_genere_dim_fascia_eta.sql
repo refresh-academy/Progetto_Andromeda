@@ -1,6 +1,6 @@
-select * from progetto_andromeda pa where pa.genere 
+select * from sondaggio.progetto_andromeda pa where pa.genere 
 
-select pa.fascia_eta from progetto_andromeda pa 
+select fascia_eta from sondaggio.progetto_andromeda 
 
 
 drop table if exists dim_genere;
@@ -8,7 +8,7 @@ drop table if exists dim_genere;
 create table dim_genere as 
 select row_number() over () as ids_genere, * from (
 	select distinct pa.genere 
-	from progetto_andromeda pa
+	from sondaggio.progetto_andromeda pa
 );
 
 drop table if exists dim_fascia_eta;
@@ -16,7 +16,7 @@ drop table if exists dim_fascia_eta;
 create table dim_fascia_eta as 
  select row_number() over () as ids_fascia_eta, * from (
    select distinct pa.fascia_eta
-from sondaggio.progetto_andromeda pa order by fascia_eta
+from sondaggio.progetto_andromeda pa
 );
 
 select * from dim_fascia_eta dfe
