@@ -49,3 +49,66 @@ order by provincia_ultimo_lavoro;
 -- creazione dim_vittima_o_testimone_in_azienda
 
 drop table if exists dim_vittima_o_testimone_di_discriminazione_in_azienda;
+
+create table dim_vittima_o_testimone_di_discriminazione_in_azienda   as 
+ select row_number() over () as ids_vittima_o_testimone_di_discriminazione_in_azienda, * from (
+   select distinct pa.vittima_o_testimone_di_discriminazione_in_azienda
+from sondaggio.progetto_andromeda pa
+
+) t 
+order by vittima_o_testimone_di_discriminazione_in_azienda;
+
+-- creazione dim_tipo_discriminazione
+
+drop table if exists dim_tipo_discriminazione;
+
+create table dim_tipo_discriminazione as 
+select row_number() over () as ids_tipo_discriminazione, * from (
+select distinct pa.tipo_discriminazione
+from sondaggio.progetto_andromeda pa
+
+) t;
+
+-- creazione dim_vittima_o_testimone_di_violenza
+
+drop table if exists dim_vittima_o_testimone_di_violenza;
+
+create table dim_vittima_o_testimone_di_violenza as 
+select row_number() over () ids_vittima_o_testimone_di_violenza, * from (
+select distinct pa.vittima_o_testimone_di_violenza
+from sondaggio.progetto_andromeda pa
+
+) t;
+
+-- creazione dim_tipo_violenza
+
+drop table if exists dim_tipo_violenza;
+
+create table dim_tipo_violenza as 
+select row_number() over () ids_tipo_violenza, * from (
+select distinct pa.tipo_violenza
+from sondaggio.progetto_andromeda pa
+
+) t;
+
+-- creazione dim_presenza_formazione_antidiscriminazione_in_azienda
+
+drop table if exists dim_presenza_formazione_antidiscriminazione_in_azienda;
+
+create table dim_presenza_formazione_antidiscriminazione_in_azienda as 
+select row_number() over () ids_presenza_formazione_antidiscriminazione_in_azienda, * from (
+select distinct pa.presenza_formazione_antidiscriminazione_in_azienda
+from sondaggio.progetto_andromeda pa
+
+) t;
+
+-- creazione dim_presenza_regolamenti_antidiscriminazione
+
+drop table if exists dim_presenza_regolamenti_antidiscriminazione;
+
+create table dim_presenza_regolamenti_antidiscriminazione as 
+select row_number() over () ids_presenza_regolamenti_antidiscriminazione, * from (
+select distinct pa.presenza_regolamenti_antidiscriminazione
+from sondaggio.progetto_andromeda pa
+
+) t;
