@@ -122,6 +122,20 @@ select distinct pa.tipo_discriminazione
 from sondaggio.progetto_andromeda pa
 
 ) t;
+-- qui c'è l'inserimento della dimensione
+-- con il fittizio 'nessuna discriminazione indicata'
+-- comunque c'è un problema con i valori
+
+drop table if exists dim_tipo_discriminazione;
+
+create table dim_tipo_discriminazione AS
+select  row_number () over(
+	 order by (valore_discriminazione = 'Nessuna discriminazione indicata')
+	desc, valore_discriminazione) as ids_tipo_discrizimazione,
+	valore_discriminazione as tipo_discriminazione from
+	(select distinct coalesce(nullif(trim(pa.tipo_discriminazione), ''), 'Nessuna discriminazione indicata')
+as valore_discriminazione from sondaggio.progetto_andromeda pa
+) t;
 
 -- creazione dim_vittima_o_testimone_di_violenza
 
