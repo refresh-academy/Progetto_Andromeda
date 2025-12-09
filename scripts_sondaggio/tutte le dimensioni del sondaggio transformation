@@ -419,3 +419,39 @@ drop table if exists dim_provincia_domicilio;
 	as provincia_ultimo_lavoro
 	from sondaggio.progetto_andromeda pa)
 	order by provincia_ultimo_lavoro) t;
+
+
+	-- proviamo
+	
+	DROP TABLE IF EXISTS dim_provincia_domicilio;
+
+CREATE TABLE dim_provincia_domicilio AS
+SELECT 
+    ROW_NUMBER() OVER() as ids_provincia_domicilio,
+    final_view.*
+FROM (
+    SELECT DISTINCT 
+        -- LA LOGICA MAGICA:
+        -- 1. Se p."Provincia" non è vuoto (trovato match), usa quello (es. Bologna).
+        -- 2. Altrimenti, scrivi 'Altro'.
+        COALESCE(p."Provincia", 'Altro') as provincia_domicilio
+        
+    FROM (
+        -- PRIMA PULIZIA: Gestisci solo le eccezioni 'sporche' manuali
+        SELECT 
+            CASE 
+               -- I tuoi casi specifici irrisolvibili con automazione
+               WHEN TRIM(LOWER(provincia_domicilio)) LIKE '%via del giardinetto%' THEN 'lucca'
+               WHEN TRIM(LOWER(provincia_domicilio)) = 'villamaina(av)' THEN 'avellino'
+               -- Rimuovi tutti gli altri WHEN (bo, rm, mn)... ci pensa la JOIN dopo!
+               ELSE TRIM(LOWER(provincia_domicilio))
+            END as input_clean
+        FROM sondaggio.progetto_andromeda
+    ) t
+    
+    -- QUI CAMBIA TUTTO: Usiamo LEFT JOIN invece di JOIN
+    LEFT JOIN province_italiane p 
+        ON LOWER(p."Sigla") = t.input_clean 
+        OR LOWER(p."Provincia") = t.input_clean
+
+) final_view;
