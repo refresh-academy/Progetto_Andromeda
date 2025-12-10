@@ -455,3 +455,24 @@ FROM (
         OR LOWER(p."Provincia") = t.input_clean
 
 ) final_view;
+
+-- questa sembra funzionare ma solo con ids_genere ed è ovviamente da ripulire
+-- mettere altre join non le fa funzionare con lo stesso procedimento purtroppo
+ SELECT "timestamp",
+--genere,
+ids_genere,
+--fascia_eta
+fascia_eta,
+provincia_domicilio,
+--grandezza_azienda
+grandezza_azienda,
+durata_lavoro_in_azienda,
+provincia_ultimo_lavoro,
+vittima_o_testimone_di_discriminazione_in_azienda,
+tipo_discriminazione, vittima_o_testimone_di_violenza,
+tipo_violenza,
+presenza_formazione_antidiscriminazione_in_azienda,
+presenza_regolamenti_antidiscriminazione
+FROM sondaggio.progetto_andromeda pa
+left join dim_genere dg -- qui ho utilizzato un alias
+on pa.genere = dg.genere
