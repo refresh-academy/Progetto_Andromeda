@@ -456,20 +456,26 @@ FROM (
 
 ) final_view;
 
--- questo "fatto" contiene tutti gli ids ma in alcune colonne appaiono i valori "NULL"
+-- qui ci sono i coalesce e i fittizzi
+-- rimane il problema della dim_provincia_domicilio e dim_provincia_ultimo_lavoro
+ drop table if exists fact_sondaggio_transformation;
 
- SELECT 
+create table fact_sondaggio_transformation as
+
+SELECT 
+"timestamp",
 ids_genere,
 ids_fascia_eta,
-ids_provincia_domicilio,
+coalesce(ids_provincia_domicilio,-1) as ids_provincia_domicilio,
 ids_grandezza_azienda,
-ids_durata_lavoro_in_azienda,
-ids_provincia_ultimo_lavoro,
+coalesce(ids_durata_lavoro_in_azienda,-1) as ids_durata_lavoro_in_azienda,
+coalesce(ids_provincia_ultimo_lavoro,-1) as ids_provincia_ultimo_lavoro,
 ids_vittima_o_testimone_di_discriminazione_in_azienda,
-ids_tipo_discriminazione, ids_vittima_o_testimone_di_violenza,
-ids_tipo_violenza,
+coalesce(ids_tipo_discriminazione,-1) as ids_tipo_discriminazione,
+ids_vittima_o_testimone_di_violenza,
+coalesce(ids_tipo_violenza,-1) as ids_tipo_violenza,
 ids_presenza_formazione_antidiscriminazione_in_azienda,
-ids_presenza_regolamenti_antidiscriminazione
+coalesce(ids_presenza_regolamenti_antidiscriminazione,-1) as ids_presenza_regolamenti_antidiscriminazione 
 FROM sondaggio.progetto_andromeda pa
 left join dim_genere dg -- qui ho utilizzato un alias
 on pa.genere = dg.genere
@@ -494,4 +500,5 @@ on pa.tipo_violenza = dtv.tipo_violenza
 left join dim_presenza_formazione_antidiscriminazione_in_azienda dpfaia 
 on pa.presenza_formazione_antidiscriminazione_in_azienda = dpfaia.presenza_formazione_antidiscriminazione_in_azienda
 left join dim_presenza_regolamenti_antidiscriminazione dpra 
-on pa.presenza_regolamenti_antidiscriminazione = dpra.presenza_regolamenti_antidiscriminazione;
+on pa.presenza_regolamenti_antidiscriminazione = dpra.presenza_regolamenti_antidiscriminazione
+order by "timestamp" ;
