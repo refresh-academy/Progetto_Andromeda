@@ -63,6 +63,11 @@ create table if not exists dim_nazione (ids_nazione integer, nazione varchar(300
 
 insert into dim_nazione (ids_nazione, nazione) values (1,'Italia'), (2,'Estero');
 
-create table if not exists dim_area (ids_area integer, area varchar(3000));
-
-insert into dim_area (ids_area, area) values (1, 'Nord-est'), (2, 'Nord-ovest'), (3, 'Centro'), (4, 'Sud'), (5, 'Isole'), (6, 'Non indicato');
+drop table if exists dim_regioni;
+create table if not exists dim_regioni as
+select row_number() over(order by territorio) as ids_regione, territorio as regione from
+(select distinct territorio from istat_landing.lt_chiamate_vittime where
+territorio in ('Marche', 'Sicilia', 'Valle d''Aosta / Vallée d''Aoste', 'Basilicata', 'Abruzzo', 'Piemonte', 'Toscana',
+'Lazio', 'Sardegna', 'Liguria', 'Lombardia', 'Campania', 'Puglia', 'Friuli-Venezia Giulia', 'Molise', 'Umbria',
+'Veneto', 'Trentino Alto Adige / Südtirol', 'Calabria', 'Emilia-Romagna'))
+order by regione asc;
