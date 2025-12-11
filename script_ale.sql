@@ -71,3 +71,15 @@ territorio in ('Marche', 'Sicilia', 'Valle d''Aosta / Vallée d''Aoste', 'Basili
 'Lazio', 'Sardegna', 'Liguria', 'Lombardia', 'Campania', 'Puglia', 'Friuli-Venezia Giulia', 'Molise', 'Umbria',
 'Veneto', 'Trentino Alto Adige / Südtirol', 'Calabria', 'Emilia-Romagna'))
 order by regione asc;
+
+set search_path to istat_dwh;
+
+create table if not exists fact_chiamate as
+select row_number() over() as ids, ids_regione, ids_sesso, ids_motivi_chiamata, ids_anno, osservazione as numero_chiamate, 
+now() as load_timestamp, 'landing' as source_system
+from istat_landing.lt_chiamate_vittime lv
+join istat_transformation.dim_regioni dr on lv.territorio=dr.regione
+join istat_transformation.dim_sesso ds on ds.sesso=lv.sesso
+join istat_transformation.dim_motivi_chiamata mc on mc.motivi_della_chiamata=lv.motivi_della_chiamata
+join istat_transformation.dim_anno da on da.time_period=lv.time_period
+order by ids asc;
