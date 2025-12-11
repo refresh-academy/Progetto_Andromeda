@@ -18,40 +18,6 @@ from sondaggio.progetto_andromeda pa
 ) t; 
 
 
-	
-	-- tabella pulita con i case when
-	drop table if exists dim_provincia_domicilio cascade;
-	
-	create table dim_provincia_domicilio as 
-	select row_number () over() , * from (select distinct 
-	trim (INITCAP (
-		case
-        when provincia_domicilio = 'bo'
-        	then 'bologna'
-        when provincia_domicilio = 'rm'
-        	then 'roma'
-        when provincia_domicilio = 'mn'
-        	then 'mantova'
-        when provincia_domicilio = 'villamaina(av)'
-        	then 'avellino'
-        when provincia_domicilio = 'via del giardinetto 30 marlia'
-        	then 'lucca'
-        when provincia_domicilio = 'tunisi'
-        	then 'estero'
-        when provincia_domicilio = 'forlì cesena'
-        	then 'forlì-cesena'
-        else provincia_domicilio 
-        end)
-                
-	) as provincia_domicilio from (select trim(lower(provincia_domicilio)) as provincia_domicilio
-	from sondaggio.progetto_andromeda pa)
-	order by provincia_domicilio) t;
-	
-	
-	
-	
-
-	
 
 -- adesso procediamo con la "dim_grandezza_azienda"
 
@@ -175,12 +141,36 @@ create table dim_presenza_regolamenti_antidiscriminazione as
 
  
 
-drop table if exists dim_provincia_domicilio CASCADE;
-create table dim_provincia_domicilio as
-	select row_number () over() , * from (
-	select distinct p."Sigla" from sondaggio.progetto_andromeda a
-	join sondaggio_transformation.province_italiane p on (p."Sigla"=a."provincia_domicilio"
-	or p."Provincia"=a."provincia_domicilio"));
+CREATE TABLE dim_provincia_domicilio AS
+SELECT 
+    ROW_NUMBER() OVER() as ids_provincia_domicilio,
+    final_view.*
+FROM (
+    SELECT DISTINCT 
+        -- LA LOGICA MAGICA:
+        -- 1. Se p."Provincia" non è vuoto (trovato match), usa quello (es. Bologna).
+        -- 2. Altrimenti, scrivi 'Altro'.
+        COALESCE(p."Provincia", 'Altro') as provincia_domicilio
+        
+    FROM (
+        -- PRIMA PULIZIA: Gestisci solo le eccezioni 'sporche' manuali
+        SELECT 
+            CASE 
+               -- I tuoi casi specifici irrisolvibili con automazione
+               WHEN TRIM(LOWER(provincia_domicilio)) LIKE '%via del giardinetto%' THEN 'lucca'
+               WHEN TRIM(LOWER(provincia_domicilio)) = 'villamaina(av)' THEN 'avellino'
+               -- Rimuovi tutti gli altri WHEN (bo, rm, mn)... ci pensa la JOIN dopo!
+               ELSE TRIM(LOWER(provincia_domicilio))
+            END as input_clean
+        FROM sondaggio.progetto_andromeda
+    ) t
+    
+    -- QUI CAMBIA TUTTO: Usiamo LEFT JOIN invece di JOIN
+    LEFT JOIN province_italiane p 
+        ON LOWER(p."Sigla") = t.input_clean 
+        OR LOWER(p."Provincia") = t.input_clean
+
+) final_view;
 	
 	
 drop table if exists dim_provincia_ultimo_lavoro CASCADE;
@@ -191,32 +181,6 @@ create table dim_provincia_ultimo_lavoro as
 	join sondaggio_transformation.province_italiane p on (p."Sigla"=a."provincia_ultimo_lavoro"
 	or p."Provincia"=a."provincia_ultimo_lavoro"));
 	
-	drop table if exists dim_provincia_domicilio CASCADE;
-	
-	create table dim_provincia_domicilio as 
-	select row_number () over() , * from (select distinct 
-	trim (INITCAP (
-		case
-        when provincia_domicilio = 'bo'
-        	then 'bologna'
-        when provincia_domicilio = 'rm'
-        	then 'roma'
-        when provincia_domicilio = 'mn'
-        	then 'mantova'
-        when provincia_domicilio = 'villamaina(av)'
-        	then 'avellino'
-        when provincia_domicilio = 'via del giardinetto 30 marlia'
-        	then 'lucca'
-        when provincia_domicilio = 'tunisi'
-        	then 'estero'
-        when provincia_domicilio = 'forlì cesena'
-        	then 'forlì-cesena'
-        else provincia_domicilio 
-        end   )
-                
-	) as provincia_domicilio from (select trim(lower(provincia_domicilio)) as provincia_domicilio
-	from sondaggio.progetto_andromeda pa)
-	order by provincia_domicilio) t;
 	
 	
 	-- questa qua sotto è la dim_provincia_ultimo_lavoro
@@ -248,3 +212,135 @@ from (
         order by provincia_ultimo_lavoro
     ) t_interna
 ) t_esterna;
+
+--ET 
+drop table if exists sondaggio_transformation.et_dim_provincia_domicilio;
+create table if not exists sondaggio_transformation.et_dim_provincia_domicilio as
+SELECT DISTINCT lower(trim(pa.provincia_domicilio)) as provincia_domicilio, 'Mapping provincia mancante' as errore
+FROM sondaggio.progetto_andromeda pa
+left JOIN sondaggio_transformation.province_italiane t
+ON (pa."provincia_domicilio" = t."Provincia" or pa."provincia_domicilio" = t."Sigla")
+WHERE t."Provincia" IS null
+AND pa.provincia_domicilio  IS NOT NULL;
+
+
+--tapella et di mapping a mano 
+DROP TABLE IF EXISTS sondaggio_transformation.et_dim_provincia_domicilio_mapping CASCADE;
+
+CREATE TABLE sondaggio_transformation.et_dim_provincia_domicilio_mapping AS
+WITH mapped AS (
+    SELECT 
+        provincia_domicilio,
+        CASE 
+            WHEN LOWER(provincia_domicilio) IN ('bo', 'bologna') THEN 'BO'
+            WHEN LOWER(provincia_domicilio) = 'estero' THEN 'Estero'
+            WHEN LOWER(provincia_domicilio) IN ('forlì cesena', 'forli cesena') THEN 'FC'
+            WHEN LOWER(provincia_domicilio) = 'lucca' THEN 'LU'
+            WHEN LOWER(provincia_domicilio) = 'milano' THEN 'MI'
+            WHEN LOWER(provincia_domicilio) = 'modena' THEN 'MO'
+            WHEN LOWER(provincia_domicilio) = 'padova' THEN 'PD'
+            WHEN LOWER(provincia_domicilio) IN ('rm', 'roma') THEN 'RM'
+            WHEN LOWER(provincia_domicilio) = 'torino' THEN 'TO'
+            WHEN LOWER(provincia_domicilio) = 'trento' THEN 'TN'
+            WHEN LOWER(provincia_domicilio) = 'tunisi' THEN 'Estero'  
+            WHEN LOWER(provincia_domicilio) = 'venezia' THEN 'VE'
+            WHEN LOWER(provincia_domicilio) LIKE '%via del giardinetto%' THEN 'LU'  
+            WHEN LOWER(provincia_domicilio) LIKE '%villamaina%' THEN 'AV'
+            ELSE NULL
+        END AS sigla
+    FROM sondaggio_transformation.et_dim_provincia_domicilio
+)
+SELECT 
+    provincia_domicilio,
+    sigla,
+    CASE 
+        WHEN sigla = 'BO' THEN 16
+        WHEN sigla = 'Estero' THEN NULL  
+        WHEN sigla = 'FC' THEN 37
+        WHEN sigla = 'LU' THEN 50
+        WHEN sigla = 'MI' THEN 57
+        WHEN sigla = 'MO' THEN 58
+        WHEN sigla = 'PD' THEN 64
+        WHEN sigla = 'RM' THEN 83
+        WHEN sigla = 'TO' THEN 95
+        WHEN sigla = 'TN' THEN 97
+        WHEN sigla = 'VE' THEN 102
+        WHEN sigla = 'AV' THEN 9
+        ELSE NULL
+    END AS ids_provincia
+FROM mapped;
+
+drop table if exists dim_provincia_domicilio CASCADE;
+create table dim_provincia_domicilio as
+	select row_number () over() as ids_provincia_domicilio , * from (
+	select distinct p."Sigla" from sondaggio.progetto_andromeda a
+	join sondaggio_transformation.province_italiane p on (p."Sigla"=a."provincia_domicilio"
+	or p."Provincia"=a."provincia_domicilio") join sondaggio_transformation.et_dim_provincia_domicilio_mapping dm
+on dm.sigla=p."Sigla");
+
+
+  --et mapping a mano 
+DROP TABLE IF EXISTS sondaggio_transformation.et_dim_provincia_mapping CASCADE;
+
+CREATE TABLE sondaggio_transformation.et_dim_provincia_mapping AS
+WITH mapped AS (
+    SELECT 
+        provincia_domicilio,
+        CASE 
+            WHEN LOWER(provincia_domicilio) IN ('bo', 'bologna') THEN 'BO'
+            WHEN LOWER(provincia_domicilio) = 'estero' THEN 'Estero'
+            WHEN LOWER(provincia_domicilio) IN ('forlì cesena', 'forli cesena') THEN 'FC'
+            WHEN LOWER(provincia_domicilio) = 'lucca' THEN 'LU'
+            WHEN LOWER(provincia_domicilio) = 'milano' THEN 'MI'
+            WHEN LOWER(provincia_domicilio) = 'modena' THEN 'MO'
+            WHEN LOWER(provincia_domicilio) = 'padova' THEN 'PD'
+            WHEN LOWER(provincia_domicilio) IN ('rm', 'roma') THEN 'RM'
+            WHEN LOWER(provincia_domicilio) = 'torino' THEN 'TO'
+            WHEN LOWER(provincia_domicilio) = 'trento' THEN 'TN'
+            WHEN LOWER(provincia_domicilio) = 'tunisi' THEN 'Estero'  
+            WHEN LOWER(provincia_domicilio) = 'venezia' THEN 'VE'
+            WHEN LOWER(provincia_domicilio) LIKE '%via del giardinetto%' THEN 'LU'  
+            WHEN LOWER(provincia_domicilio) LIKE '%villamaina%' THEN 'AV'
+            ELSE NULL
+        END AS sigla
+    FROM sondaggio_transformation.et_dim_provincia_domicilio
+)
+SELECT 
+    provincia_domicilio,
+    sigla,
+    CASE 
+        WHEN sigla = 'BO' THEN 16
+        WHEN sigla = 'Estero' THEN NULL
+        WHEN sigla = 'FC' THEN 37
+        WHEN sigla = 'LU' THEN 50
+        WHEN sigla = 'MI' THEN 57
+        WHEN sigla = 'MO' THEN 58
+        WHEN sigla = 'PD' THEN 64
+        WHEN sigla = 'RM' THEN 83
+        WHEN sigla = 'TO' THEN 95
+        WHEN sigla = 'TN' THEN 97
+        WHEN sigla = 'VE' THEN 102
+        WHEN sigla = 'AV' THEN 9
+        ELSE NULL
+    END AS ids_provincia
+FROM mapped;
+
+--creazione del fatto 
+select row_number() over() as ids, *
+from (
+    select 
+        dg.ids_genere, 
+        d.ids_fascia_eta, 
+        coalesce(dpr.ids_provincia, et.ids_provincia) as ids_provincia
+    from sondaggio.progetto_andromeda pa
+    left join dim_genere dg on dg.genere = pa.genere
+    left join dim_fascia_eta d on pa.fascia_eta = d.fascia_eta
+    left join dim_provincia_regione dpr  
+        on pa.provincia_domicilio = dpr."territorio" 
+        or pa.provincia_domicilio = dpr."sigla_territorio"
+    left join sondaggio_transformation.et_dim_provincia_domicilio_mapping et 
+        on et.sigla = dpr.sigla_territorio ) sub;
+
+select coalesce(dpr.ids_provincia, edpdm.ids_provincia) from sondaggio.progetto_andromeda pa 
+left join dim_provincia_regione dpr on (lower(pa.provincia_domicilio) = lower(dpr.sigla_territorio) or lower(pa.provincia_domicilio) = lower(dpr.territorio) )
+left join sondaggio_transformation.et_dim_provincia_domicilio_mapping edpdm on lower(edpdm.provincia_domicilio) = lower(pa.provincia_domicilio) 
