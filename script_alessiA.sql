@@ -72,7 +72,7 @@ territorio in ('Marche', 'Sicilia', 'Valle d''Aosta / Vallée d''Aoste', 'Basili
 'Veneto', 'Trentino Alto Adige / Südtirol', 'Calabria', 'Emilia-Romagna'))
 order by regione asc;
 
-set search_path to istat_dwh;
+set search_path to dwh_progettoandromeda;
 
 create table if not exists fact_chiamate as
 select row_number() over() as ids, ids_regione, ids_sesso, ids_motivi_chiamata, ids_anno, osservazione as numero_chiamate, 
