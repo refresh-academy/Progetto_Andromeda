@@ -61,60 +61,23 @@ order by vittima_o_testimone_di_discriminazione_in_azienda;
 
 --dim tipo discriminazione
 
-drop table if exists dim_tipo_discriminazione cascade;
-
-create table dim_tipo_discriminazione as
-SELECT 
-    row_number() OVER (
-        ORDER BY 
-            (valore_discriminazione = 'Nessuna discriminazione indicata') DESC, 
-            valore_discriminazione
-    ) as ids_tipo_discriminazione,
-    valore_discriminazione as tipo_discriminazione
-FROM 
-    (
-    -- LIVELLO 2: Pulisce i dati, gestisce i NULL e rimuove i duplicati
-    select distinct 
-        COALESCE(NULLIF(TRIM(t1.singolo_elemento), ''), 'Nessuna discriminazione indicata') 
-        as valore_discriminazione
-    FROM 
-        (
-        -- LIVELLO 1 (Il cuore): Spacchetta le stringhe separate dalla virgola
-        SELECT 
-            unnest(string_to_array(pa.tipo_discriminazione, ',')) as singolo_elemento 
-        FROM 
-            sondaggio.progetto_andromeda pa
-        ) t1
-    ) t2;
-
+drop table if exists dim_tipo_discriminazione;
+create table if not exists dim_tipo_discriminazione as
+ select row_number() over() as ids_tipo_discriminazione, * from (
+SELECT DISTINCT
+    COALESCE(trim(elem), 'Nessuna discriminazione indicata') AS tipo_discriminazione
+FROM sondaggio.progetto_andromeda pa
+LEFT JOIN LATERAL unnest(string_to_array(pa.tipo_discriminazione, ',')) AS elem ON true);
 
 -- qui sotto la query che funziona con i dati puliti della dim_tipo_violenza
 
-drop table if exists dim_tipo_violenza cascade;
-
-create table dim_tipo_violenza as
-SELECT 
-    row_number() OVER (
-        ORDER BY 
-            (valore_violenza = 'Nessuna violenza indicata') DESC, 
-            valore_violenza
-    ) as ids_tipo_violenza,
-    valore_violenza as tipo_violenza
-FROM 
-    (
-    -- LIVELLO 2: Pulisce gli spazi, gestisce i NULL/vuoti e rimuove i duplicati
-    SELECT DISTINCT 
-        COALESCE(NULLIF(TRIM(t1.singolo_elemento), ''), 'Nessuna violenza indicata') 
-        as valore_violenza
-    FROM 
-        (
-        -- LIVELLO 1: Spacchetta le stringhe separate da virgola
-        SELECT 
-            unnest(string_to_array(pa.tipo_violenza, ',')) as singolo_elemento 
-        FROM 
-            sondaggio.progetto_andromeda pa
-        ) t1
-    ) t2;
+drop table if exists dim_tipo_violenza;
+create table if not exists dim_tipo_violenza as
+ select row_number() over() as ids_tipo_violenza, * from (
+SELECT DISTINCT
+    COALESCE(trim(elem), 'Nessuna violenza indicata') AS tipo_violenza
+FROM sondaggio.progetto_andromeda pa
+LEFT JOIN LATERAL unnest(string_to_array(pa.tipo_violenza, ',')) AS elem ON true);
 
 -- creazione dim_presenza_formazione_antidiscriminazione_in_azienda
 
@@ -199,8 +162,8 @@ drop table if exists sondaggio_transformation.et_dim_provincia;
 
 
 -- tabella errori provincia
-
-create table et_dim_provincia as 
+drop table if exists et_dim_provincia;
+create table if not exists et_dim_provincia as 
 select FORMAT('Valore provincia "%s" non valido',rotti.provincia ) as messaggio from(
 select provincia 
 from sondaggio_transformation.tt_provincia_validated_v01
@@ -253,30 +216,57 @@ left join sondaggio_transformation.province_italiane t
 on lower(trim(pa.provincia_ultimo_lavoro))=lower(t."Sigla")
 where t."Provincia" is null;
 
-
--- inizio di creazione del fatto
-
-select row_number() over() as ids_risposta, *
+--creazione del fatto 
+drop table if exists fact_sondaggio;
+create table if not exists fact_sondaggio as 
+select 
+    row_number() over() as ids_risposta,
+    *
 from (
-	select 
-	coalesce(dp.ids_provincia,coalesce(dp2.ids_provincia ,-1)) as ids_provincia_domicilio,
-	coalesce(dp_l.ids_provincia,coalesce(dp_l2.ids_provincia ,-1)) as ids_provincia_ultimo_lavoro,
-	coalesce(dg.ids_genere,-1) as ids_genere, 
-	coalesce(d.ids_fascia_eta,-1) as ids_fascia_eta
-	from sondaggio_transformation.tt_sondaggio_province_ultimo_lavoro_ok_v3 pa 
-	left join sondaggio_transformation.dim_provincia dp
-	on lower(pa.provincia_domicilio)=lower(dp.provincia)
-	left join sondaggio_transformation.man_mapping_province mmp
-	on lower(pa.provincia_domicilio)=lower(mmp.originale )
-	left join sondaggio_transformation.dim_provincia dp2
-	on lower(mmp.corretto )=lower(dp2.provincia)
-	left join sondaggio_transformation.dim_provincia dp_l
-	on lower(pa.provincia_ultimo_lavoro)=lower(dp.provincia)
-	left join sondaggio_transformation.man_mapping_province mmpl
-	on lower(pa.provincia_ultimo_lavoro)=lower(mmp.originale )
-	left join sondaggio_transformation.dim_provincia dp_l2
-	on lower(mmpl.corretto )=lower(dp2.provincia)
-	 left join sondaggio_transformation.dim_genere dg on dg.genere = pa.genere
-	left join sondaggio_transformation.dim_fascia_eta d on pa.fascia_eta = d.fascia_eta
-)
-
+    select
+        coalesce(dg.ids_genere, -1) as ids_genere, 
+        coalesce(d.ids_fascia_eta, -1) as ids_fascia_eta,
+        coalesce(dp.ids_provincia, coalesce(dp2.ids_provincia, -1)) as ids_provincia_domicilio,
+        coalesce(ga.ids_grandezza_azienda, -1) as ids_grandezza_azienda,
+        coalesce(ddlia.ids_durata_lavoro_in_azienda, -1) as ids_durata_lavoro_in_azienda,
+        coalesce(dp_l.ids_provincia, coalesce(dp_l2.ids_provincia, -1)) as ids_provincia_ultimo_lavoro,
+        coalesce(ids_vittima_o_testimone_di_discriminazione_in_azienda, -1) as ids_vittima_o_testimone,
+        coalesce(ids_tipo_discriminazione, -1) as ids_tipo_discriminazione,
+        coalesce(ids_tipo_violenza, -1) as ids_tipo_violenza,
+        coalesce(ids_presenza_formazione_antidiscriminazione_in_azienda, -1) as ids_presenza_formazione,
+        coalesce(ids_presenza_regolamenti_antidiscriminazione, -1) as ids_presenza_regolamenti
+from sondaggio_transformation.tt_sondaggio_province_ultimo_lavoro_ok_v3 pa 
+left join sondaggio_transformation.dim_genere dg 
+        on dg.genere = pa.genere
+left join sondaggio_transformation.dim_fascia_eta d 
+        on d.fascia_eta = pa.fascia_eta
+left join sondaggio_transformation.dim_provincia dp
+        on lower(pa.provincia_domicilio) = lower(dp.provincia)
+left join sondaggio_transformation.man_mapping_province mmp
+        on lower(pa.provincia_domicilio) = lower(mmp.originale)
+left join sondaggio_transformation.dim_provincia dp2
+        on lower(mmp.corretto) = lower(dp2.provincia)
+left join sondaggio_transformation.dim_provincia dp_l
+        on lower(pa.provincia_ultimo_lavoro) = lower(dp_l.provincia)
+left join sondaggio_transformation.man_mapping_province mmpl
+        on lower(pa.provincia_ultimo_lavoro) = lower(mmpl.originale)
+left join sondaggio_transformation.dim_provincia dp_l2
+        on lower(mmpl.corretto) = lower(dp_l2.provincia)
+left join sondaggio_transformation.dim_grandezza_azienda ga
+        on ga.grandezza_azienda = pa.grandezza_azienda 
+left join sondaggio_transformation.dim_durata_lavoro_in_azienda ddlia 
+        on ddlia.durata_lavoro_in_azienda = pa.durata_lavoro_in_azienda 
+left join sondaggio_transformation.dim_vittima_o_testimone_di_discriminazione_in_azienda dvotddia 
+        on dvotddia.vittima_o_testimone_di_discriminazione_in_azienda = 
+           pa.vittima_o_testimone_di_discriminazione_in_azienda 
+left join sondaggio_transformation.dim_tipo_discriminazione dtd 
+        on dtd.tipo_discriminazione = pa.tipo_discriminazione 
+left join sondaggio_transformation.dim_tipo_violenza dtv 
+        on dtv.tipo_violenza = pa.tipo_violenza 
+left join sondaggio_transformation.dim_presenza_formazione_antidiscriminazione_in_azienda dpfaia 
+        on dpfaia.presenza_formazione_antidiscriminazione_in_azienda = 
+           pa.presenza_formazione_antidiscriminazione_in_azienda 
+left join sondaggio_transformation.dim_presenza_regolamenti_antidiscriminazione dpra
+        on dpra.presenza_regolamenti_antidiscriminazione = 
+           pa.presenza_regolamenti_antidiscriminazione 
+) t;
