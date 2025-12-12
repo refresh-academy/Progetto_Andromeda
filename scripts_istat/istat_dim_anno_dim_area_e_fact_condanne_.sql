@@ -19,7 +19,7 @@ from istat_landing.lt_condanne_reati_violenti_sesso_reg ltcrv
 );
 
 
--- per la dim_anno usare istat_transformation.dim_anno
+-- per la dim_anno creo con una union
 
 drop table if exists istat_transformation.dim_anno;
 
@@ -94,13 +94,32 @@ select row_number() over() as
 	ids_anno, 
 	osservazione as numero_condanne
 from istat_landing.lt_condanne_reati_violenti_sesso_reg crv
--- join istat_transformation.mapping_città_regione mpc on mpc.territorio=dd.territorio
+join istat_transformation.dim_  mpc on mpc.territorio=dd.territorio
 join istat_transformation.dim_tipo_reato dtr on dtr.tipo_di_reato=crv.tipo_di_reato
 join istat_transformation.dim_sesso ds on ds.sesso=crv.sesso
 join istat_transformation.dim_anno da on da.time_period=crv.time_period
 order by ids asc;
 
-select count (*) from istat_dwh.fact_condanne_reati fcr;
+drop table if exists dwh_progettoandromeda.fact_condanne_reati_violenti_sesso_eta_reg;
 
+create table if not exists dwh_progettoandromeda.fact_condanne_reati_violenti_sesso_eta_reg as
+select row_number() over() as 
+	ids, 
+	ids_nazione,
+	ids_reato, 
+	ids_sesso,  
+	ids_anno, 
+	osservazione as numero_condanne
+from istat_landing.lt_condanne_reati_violenti_sesso_reg crv
+join istat_transformation.dim_nazione itdn on itdn.nazione=crv.territorio
+join istat_transformation.dim_tipo_reato dtr on dtr.tipo_di_reato=crv.tipo_di_reato
+join istat_transformation.dim_sesso ds on ds.sesso=crv.sesso
+join istat_transformation.dim_anno da on da.time_period=crv.time_period
+order by ids asc;
 
-
+/*
+select count (*) from istat_dwh.fact_condanne_reati fcr
+union all
+select count (*) from istat_landing.lt_condanne_reati_violenti_sesso_reg
+where sesso !='Totale';
+*/
