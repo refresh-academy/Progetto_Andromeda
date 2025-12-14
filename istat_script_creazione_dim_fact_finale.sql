@@ -1,6 +1,3 @@
-drop schema if exists istat_landing cascade;
-create schema istat_landing;
-
 drop schema if exists istat_transformation cascade;
 create schema istat_transformation;
 
