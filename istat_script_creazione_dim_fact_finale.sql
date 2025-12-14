@@ -1,3 +1,6 @@
+-- ricordarsi di mettere tutte le cose di alessio con time_period
+
+
 drop schema if exists istat_transformation cascade;
 create schema istat_transformation;
 
@@ -49,7 +52,7 @@ create table if not exists istat_transformation.dim_anno
 as
 select
 ROW_Number () over (order by time_period) as ids_anno,
-time_period as anno,
+time_period,
 now () as load_timestamp,
 'Landing' as source_system
 from (
@@ -96,6 +99,126 @@ where territorio in
 'Isole'
 )
 );
+
+
+-- INIZIO CODICE PROVINCE
+-- creo mapping provincia
+
+
+DROP TABLE IF EXISTS mapping_regione_provincia;
+
+CREATE TABLE mapping_regione_provincia AS
+SELECT
+  row_number() OVER (ORDER BY provincia) AS ids_provincia,
+  provincia,
+  regione,
+  NOW()::timestamp AS load_timestamp,
+  'istat_script_creazione' AS source_system
+FROM (
+  SELECT DISTINCT provincia, regione
+  FROM (VALUES
+    ('Agrigento','Sicilia'),
+    ('Alessandria','Piemonte'),
+    ('Aosta','Valle d''Aosta / Vallée d''Aoste'),
+    ('Arezzo','Toscana'),
+    ('Ascoli Piceno','Marche'),
+    ('Asti','Piemonte'),
+    ('Avellino','Campania'),
+    ('Bari','Puglia'),
+    ('Barletta-Andria-Trani','Puglia'),
+    ('Belluno','Veneto'),
+    ('Bergamo','Lombardia'),
+    ('Biella','Piemonte'),
+    ('Bologna','Emilia-Romagna'),
+    ('Bolzano','Trentino Alto Adige / Südtirol'),
+    ('Brescia','Lombardia'),
+    ('Brindisi','Puglia'),
+    ('Cagliari','Sardegna'),
+    ('Caltanissetta','Sicilia'),
+    ('Campobasso','Molise'),
+    ('Caserta','Campania'),
+    ('Catania','Sicilia'),
+    ('Catanzaro','Calabria'),
+    ('Chieti','Abruzzo'),
+    ('Como','Lombardia'),
+    ('Cremona','Lombardia'),
+    ('Crotone','Calabria'),
+    ('Cuneo','Piemonte'),
+    ('Enna','Sicilia'),
+    ('Fermo','Marche'),
+    ('Ferrara','Emilia-Romagna'),
+    ('Firenze','Toscana'),
+    ('Foggia','Puglia'),
+    ('Forlì-Cesena','Emilia-Romagna'),
+    ('Frosinone','Lazio'),
+    ('Gorizia','Friuli-Venezia Giulia'),
+    ('Grosseto','Toscana'),
+    ('Imperia','Liguria'),
+    ('Isernia','Molise'),
+    ('La Spezia','Liguria'),
+    ('L''Aquila','Abruzzo'),
+    ('Latina','Lazio'),
+    ('Lecce','Puglia'),
+    ('Lecco','Lombardia'),
+    ('Livorno','Toscana'),
+    ('Lodi','Lombardia'),
+    ('Lucca','Toscana'),
+    ('Macerata','Marche'),
+    ('Mantova','Lombardia'),
+    ('Massa-Carrara','Toscana'),
+    ('Matera','Basilicata'),
+    ('Messina','Sicilia'),
+    ('Milano','Lombardia'),
+    ('Modena','Emilia-Romagna'),
+    ('Monza e della Brianza','Lombardia'),
+    ('Napoli','Campania'),
+    ('Novara','Piemonte'),
+    ('Nuoro','Sardegna'),
+    ('Oristano','Sardegna'),
+    ('Padova','Veneto'),
+    ('Palermo','Sicilia'),
+    ('Parma','Emilia-Romagna'),
+    ('Pavia','Lombardia'),
+    ('Perugia','Umbria'),
+    ('Pesaro e Urbino','Marche'),
+    ('Pescara','Abruzzo'),
+    ('Pisa','Toscana'),
+    ('Pistoia','Toscana'),
+    ('Pordenone','Friuli-Venezia Giulia'),
+    ('Potenza','Basilicata'),
+    ('Prato','Toscana'),
+    ('Reggio nell''Emilia','Emilia-Romagna'),
+    ('Reggio di Calabria','Calabria'),
+    ('Ragusa','Sicilia'),
+    ('Ravenna','Emilia-Romagna'),
+    ('Rimini','Emilia-Romagna'),
+    ('Roma','Lazio'),
+    ('Salerno','Campania'),
+    ('Sassari','Sardegna'),
+    ('Savona','Liguria'),
+    ('Siena','Toscana'),
+    ('Siracusa','Sicilia'),
+    ('Sondrio','Lombardia'),
+    ('Taranto','Puglia'),
+    ('Teramo','Abruzzo'),
+    ('Terni','Umbria'),
+    ('Trento','Trentino Alto Adige / Südtirol'),
+    ('Treviso','Veneto'),
+    ('Trieste','Friuli-Venezia Giulia'),
+    ('Udine','Friuli-Venezia Giulia'),
+    ('Varese','Lombardia'),
+    ('Venezia','Veneto'),
+    ('Verbano-Cusio-Ossola','Piemonte'),
+    ('Vercelli','Piemonte'),
+    ('Verona','Veneto'),
+    ('Vibo Valentia','Calabria')
+  ) AS v(provincia, regione)
+) s
+ORDER BY provincia;
+
+
+
+-- FINE CODICE PROVINCE
 
 
 drop schema if exists istat_dwh cascade;
