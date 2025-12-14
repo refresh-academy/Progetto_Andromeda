@@ -23,7 +23,7 @@ NOW() as load_timestamp,
 'Landing' as source_system
 from  
 (select distinct sesso
-from select distinct sesso from istat_landing.lt_vittime
+from select distinct sesso from istat_landing.lt_chiamate_vittime
 );
 
 /*
@@ -35,7 +35,7 @@ create table if not exists dim_sesso as select row_number() over() as ids_sesso,
 drop table if exists dim_motivi_chiamata;
 
 create table if not exists dim_motivi_chiamata as select row_number() over() as ids_motivi_chiamata, motivi_della_chiamata from
-(select distinct motivi_della_chiamata from istat_landing.lt_vittime);
+(select distinct motivi_della_chiamata from istat_landing.lt_chiamate_vittime);
 
 -- commento codice Aa
 -- create table if not exists dim_anno as select row_number() over() as ids_anno, time_period from (select distinct time_period from istat_landing.lt_vittime);
