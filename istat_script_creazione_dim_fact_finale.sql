@@ -1,127 +1,166 @@
--- ricordarsi di mettere tutte le cose di alessio con time_period
 
+-- schema transformation
+DROP SCHEMA IF EXISTS istat_transformation CASCADE;
+CREATE SCHEMA istat_transformation;
 
-drop schema if exists istat_transformation cascade;
-create schema istat_transformation;
-
-set search_path to istat_transformation;
+SET search_path TO istat_transformation;
 
 -- creazione dimensioni in transformation schema
 
-drop table if exists dim_territorio;
+-- dim_territorio (da lt_chiamate_vittime)
+DROP TABLE IF EXISTS istat_transformation.dim_territorio;
+CREATE TABLE istat_transformation.dim_territorio AS
+SELECT row_number() OVER (ORDER BY territorio) AS ids_territorio,
+       territorio
+FROM (
+  SELECT DISTINCT territorio
+  FROM istat_landing.lt_chiamate_vittime
+) t
+ORDER BY territorio;
 
-create table if not exists dim_territorio as select row_number() over() as ids_territorio, territorio from (select distinct territorio from istat_landing.lt_chiamate_vittime);
+-- dim_indicatore
 
-
--- creo dim_sesso usando mio codice e fonte Aa 
-
-drop table if exists istat_transformation.dim_sesso;
-
-create table istat_transformation.dim_sesso
-as
-select 
-ROW_Number () over (order by sesso) as ids_sesso,
-sesso,
-NOW() as load_timestamp,
-'Landing' as source_system
-from  
-(select distinct sesso from istat_landing.lt_chiamate_vittime
-);
-
-/*
-drop table if exists dim_sesso;
-
-create table if not exists dim_sesso as select row_number() over() as ids_sesso, sesso from (select distinct sesso from istat_landing.lt_chiamate_vittime); 
-*/
-
-drop table if exists dim_motivi_chiamata;
-
-create table if not exists dim_motivi_chiamata as select row_number() over() as ids_motivi_chiamata, motivi_della_chiamata from
-(select distinct motivi_della_chiamata from istat_landing.lt_chiamate_vittime);
-
--- commento codice Aa
--- create table if not exists dim_anno as select row_number() over() as ids_anno, time_period from (select distinct time_period from istat_landing.lt_chiamate_vittime);
-
--- inserisco mio codice ndAo
-
--- dim_fascia_eta
-
-drop table if exists dim_fascia_eta;
-
-create table if not exists dim_fascia_eta as
-select 
-row_number() over(order by eta) as ids_eta, 
-eta,
-NOW()::timestamp as load_timestamp,
-'Landing' as source_system
-from
-(select distinct eta from istat_landing.lt_denunce_delitti
-order by eta);
-
--- per la dim_anno creo con una union
-
-drop table if exists istat_transformation.dim_anno;
-
-create table if not exists istat_transformation.dim_anno
-as
+drop table if exists istat_transformation.dim_indicatore;
+create table istat_transformation.dim_indicatore as
 select
-ROW_Number () over (order by time_period) as ids_anno,
-time_period,
-now () as load_timestamp,
-'Landing' as source_system
+	row_number() over (order by indicatore) as ids_indicatore,
+	indicatore,
+	NOW()::timestamp as load_timestamp,
+	'lt_denunce_delitti' as source_system
 from (
-select distinct time_period from istat_landing.lt_chiamate_vittime
-union
-select distinct time_period from istat_landing.lt_condanne_reati_violenti_sesso_reg lcrvsr
-order by time_period asc);
+select distinct trim(indicatore) as indicatore
+from istat_landing.lt_denunce_delitti
+where trim(coalesce(indicatore, '')) <> ''
+) t
+order by indicatore;
 
--- fine inserimento mio codice per anno
-
-drop table if exists istat_transformation.dim_tipo_reato;
-
-create table istat_transformation.dim_tipo_reato
-as
-select 
-ROW_Number () over (order by tipo_di_reato) as ids_reato,
-tipo_di_reato,
-NOW() as load_timestamp,
-'Landing' as source_system
-from  
-(select distinct tipo_di_reato 	
-from istat_landing.lt_condanne_reati_violenti_sesso_reg ltcrv
-);
-
--- creo dim_area
-
-DROP TABLE if exists istat_transformation.dim_area;
-
-create table istat_transformation.dim_area
-as
-select 
-ROW_Number () over (order by territorio) as ids_area,
-territorio as nome_area,
-NOW() as load_timestamp,
-'Landing' as source_system
-from  --istat_landing.lt_chiamate_vittime
-(select distinct territorio 
-from istat_landing.lt_chiamate_vittime
-where territorio in 
-('Nord-ovest',
-'Nord-est',
-'Centro',
-'Sud',
-'Isole'
-)
-);
+-- dim_sesso
+DROP TABLE IF EXISTS istat_transformation.dim_sesso;
+CREATE TABLE istat_transformation.dim_sesso AS
+SELECT
+  ROW_NUMBER() OVER (ORDER BY sesso) AS ids_sesso,
+  sesso,
+  NOW()::timestamp AS load_timestamp,
+  'lt_chiamate_vittime' AS source_system
+FROM (
+  SELECT DISTINCT trim(sesso) AS sesso
+  FROM istat_landing.lt_chiamate_vittime
+  WHERE trim(coalesce(sesso,'')) <> ''
+) t
+ORDER BY sesso;
 
 
--- INIZIO CODICE PROVINCE
--- creo mapping provincia
+-- dim_motivi_chiamata
+DROP TABLE IF EXISTS istat_transformation.dim_motivi_chiamata;
+CREATE TABLE istat_transformation.dim_motivi_chiamata AS
+SELECT row_number() OVER (ORDER BY motivi_della_chiamata) AS ids_motivi_chiamata,
+       motivi_della_chiamata
+FROM (
+  SELECT DISTINCT motivi_della_chiamata
+  FROM istat_landing.lt_chiamate_vittime
+  WHERE trim(coalesce(motivi_della_chiamata,'')) <> ''
+) t
+ORDER BY motivi_della_chiamata;
 
 
-DROP TABLE IF EXISTS mapping_regione_provincia;
+-- dim_fascia_eta (unificata, proveniente da due landing)
+DROP TABLE IF EXISTS istat_transformation.dim_fascia_eta;
+CREATE TABLE istat_transformation.dim_fascia_eta AS
+SELECT
+  row_number() OVER (ORDER BY eta) AS ids_eta,
+  eta,
+  NOW()::timestamp AS load_timestamp,
+  source_system
+FROM (
+  SELECT
+    eta,
+    string_agg(DISTINCT source, ',') AS source_system
+  FROM (
+    SELECT DISTINCT trim(eta_del_condannato_al_momento_del_reato) AS eta, 'lt_condanne_eta_sesso' AS source
+    FROM istat_landing.lt_condanne_eta_sesso
+    WHERE trim(coalesce(eta_del_condannato_al_momento_del_reato, '')) <> ''
 
-CREATE TABLE mapping_regione_provincia AS
+    UNION ALL
+
+    SELECT DISTINCT trim(eta) AS eta, 'lt_denunce_delitti' AS source
+    FROM istat_landing.lt_denunce_delitti
+    WHERE trim(coalesce(eta, '')) <> ''
+  ) x
+  GROUP BY eta
+) t
+ORDER BY eta;
+
+
+-- dim_anno (unisce anni da più landing)
+DROP TABLE IF EXISTS istat_transformation.dim_anno;
+CREATE TABLE istat_transformation.dim_anno AS
+SELECT
+  ROW_NUMBER() OVER (ORDER BY time_period) AS ids_anno,
+  time_period,
+  NOW()::timestamp AS load_timestamp,
+  'landing_combined' AS source_system
+FROM (
+  SELECT DISTINCT time_period FROM istat_landing.lt_chiamate_vittime
+  UNION
+  SELECT DISTINCT time_period FROM istat_landing.lt_condanne_reati_violenti_sesso_reg
+  UNION
+  SELECT DISTINCT time_period FROM istat_landing.lt_condanne_eta_sesso
+  UNION
+  SELECT DISTINCT time_period FROM istat_landing.lt_denunce_delitti
+) t
+WHERE time_period IS NOT NULL
+ORDER BY time_period;
+
+
+-- dim_tipo_reato (unificata e traccia sorgente)
+DROP TABLE IF EXISTS istat_transformation.dim_tipo_reato;
+CREATE TABLE istat_transformation.dim_tipo_reato AS
+SELECT
+  row_number() OVER (ORDER BY tipo_di_reato) AS ids_reato,
+  tipo_di_reato,
+  NOW()::timestamp AS load_timestamp,
+  source_system
+FROM (
+  SELECT
+    tipo_di_reato,
+    string_agg(DISTINCT source, ',') AS source_system
+  FROM (
+    SELECT DISTINCT trim(tipo_di_reato) AS tipo_di_reato, 'lt_condanne_eta_sesso' AS source
+    FROM istat_landing.lt_condanne_eta_sesso
+    WHERE trim(coalesce(tipo_di_reato, '')) <> ''
+
+    UNION ALL
+
+    SELECT DISTINCT trim(tipo_di_reato) AS tipo_di_reato, 'lt_condanne_reati_violenti_sesso_reg' AS source
+    FROM istat_landing.lt_condanne_reati_violenti_sesso_reg
+    WHERE trim(coalesce(tipo_di_reato, '')) <> ''
+  ) x
+  GROUP BY tipo_di_reato
+) t
+ORDER BY tipo_di_reato;
+
+
+-- dim_area (macro-aree)
+DROP TABLE IF EXISTS istat_transformation.dim_area;
+CREATE TABLE istat_transformation.dim_area AS
+SELECT 
+  ROW_NUMBER() OVER (ORDER BY territorio) AS ids_area,
+  territorio AS nome_area,
+  NOW()::timestamp AS load_timestamp,
+  'lt_chiamate_vittime' AS source_system
+FROM (
+  SELECT DISTINCT territorio 
+  FROM istat_landing.lt_chiamate_vittime
+  WHERE territorio IN (
+    'Nord-ovest','Nord-est','Centro','Sud','Isole'
+  )
+) t
+ORDER BY territorio;
+
+
+-- mapping province -> regione
+DROP TABLE IF EXISTS istat_transformation.mapping_regione_provincia;
+CREATE TABLE istat_transformation.mapping_regione_provincia AS
 SELECT
   row_number() OVER (ORDER BY provincia) AS ids_provincia,
   provincia,
@@ -133,7 +172,8 @@ FROM (
   FROM (VALUES
     ('Agrigento','Sicilia'),
     ('Alessandria','Piemonte'),
-    ('Aosta','Valle d''Aosta / Vallée d''Aoste'), 
+    ('Ancona','Marche'),
+    ('Aosta','Valle d''Aosta / Vallée d''Aoste'),
     ('Arezzo','Toscana'),
     ('Ascoli Piceno','Marche'),
     ('Asti','Piemonte'),
@@ -141,6 +181,7 @@ FROM (
     ('Bari','Puglia'),
     ('Barletta-Andria-Trani','Puglia'),
     ('Belluno','Veneto'),
+    ('Benevento','Campania'),
     ('Bergamo','Lombardia'),
     ('Biella','Piemonte'),
     ('Bologna','Emilia-Romagna'),
@@ -154,6 +195,7 @@ FROM (
     ('Catania','Sicilia'),
     ('Catanzaro','Calabria'),
     ('Chieti','Abruzzo'),
+    ('Cosenza','Calabria'),
     ('Como','Lombardia'),
     ('Cremona','Lombardia'),
     ('Crotone','Calabria'),
@@ -165,6 +207,7 @@ FROM (
     ('Foggia','Puglia'),
     ('Forlì-Cesena','Emilia-Romagna'),
     ('Frosinone','Lazio'),
+    ('Genova','Liguria'),
     ('Gorizia','Friuli-Venezia Giulia'),
     ('Grosseto','Toscana'),
     ('Imperia','Liguria'),
@@ -196,6 +239,7 @@ FROM (
     ('Perugia','Umbria'),
     ('Pesaro e Urbino','Marche'),
     ('Pescara','Abruzzo'),
+    ('Piacenza','Emilia-Romagna'),
     ('Pisa','Toscana'),
     ('Pistoia','Toscana'),
     ('Pordenone','Friuli-Venezia Giulia'),
@@ -207,6 +251,8 @@ FROM (
     ('Ravenna','Emilia-Romagna'),
     ('Rimini','Emilia-Romagna'),
     ('Roma','Lazio'),
+    ('Rieti','Lazio'),
+    ('Rovigo','Veneto'),
     ('Salerno','Campania'),
     ('Sassari','Sardegna'),
     ('Savona','Liguria'),
@@ -216,88 +262,168 @@ FROM (
     ('Taranto','Puglia'),
     ('Teramo','Abruzzo'),
     ('Terni','Umbria'),
+    ('Trapani','Sicilia'),
     ('Trento','Trentino Alto Adige / Südtirol'),
     ('Treviso','Veneto'),
     ('Trieste','Friuli-Venezia Giulia'),
+    ('Torino','Piemonte'),
     ('Udine','Friuli-Venezia Giulia'),
     ('Varese','Lombardia'),
     ('Venezia','Veneto'),
     ('Verbano-Cusio-Ossola','Piemonte'),
     ('Vercelli','Piemonte'),
     ('Verona','Veneto'),
-    ('Vibo Valentia','Calabria')
+    ('Vibo Valentia','Calabria'),
+    ('Vicenza','Veneto'),
+    ('Viterbo','Lazio')
   ) AS v(provincia, regione)
 ) s
 ORDER BY provincia;
 
 
--- FINE CODICE PROVINCE
+-- fine transformation schema
 
 
-drop schema if exists istat_dwh cascade;
-create schema istat_dwh;
+-- ora creo schema dwh e i fact (istat_dwh per chiarezza)
+DROP SCHEMA IF EXISTS istat_dwh CASCADE;
+CREATE SCHEMA istat_dwh;
 
-set search_path to istat_dwh;
+-- Crea fact_vittime nello schema istat_dwh
+DROP TABLE IF EXISTS istat_dwh.fact_vittime;
+CREATE TABLE istat_dwh.fact_vittime AS
+SELECT
+  row_number() OVER (ORDER BY lv.time_period, lv.territorio) AS ids,
+  dt.ids_territorio,
+  ds.ids_sesso,
+  mc.ids_motivi_chiamata,
+  da.ids_anno,
+  lv.osservazione AS numero_chiamate,
+  NOW()::timestamp AS load_timestamp,
+  'lt_chiamate_vittime' AS source_system
+FROM istat_landing.lt_chiamate_vittime lv
+JOIN istat_transformation.dim_territorio dt ON dt.territorio = lv.territorio
+JOIN istat_transformation.dim_sesso ds ON ds.sesso = lv.sesso
+JOIN istat_transformation.dim_motivi_chiamata mc ON mc.motivi_della_chiamata = lv.motivi_della_chiamata
+JOIN istat_transformation.dim_anno da ON da.time_period = lv.time_period
+ORDER BY ids;
 
-create table if not exists fact_vittime as
-select row_number() over() as ids, ids_territorio, ids_sesso, ids_motivi_chiamata, ids_anno, osservazione as numero_chiamate
-from istat_landing.lt_chiamate_vittime lv
-join istat_transformation.dim_territorio dt on dt.territorio=lv.territorio
-join istat_transformation.dim_sesso ds on ds.sesso=lv.sesso
-join istat_transformation.dim_motivi_chiamata mc on mc.motivi_della_chiamata=lv.motivi_della_chiamata
-join istat_transformation.dim_anno da on da.time_period=lv.time_period
-order by ids asc;
 
-set search_path to istat_transformation;
+-- crea dim_eta e altre dim locali in transformation sono già create; qui non duplicare
 
-create table if not exists dim_eta as
-select row_number() over() as ids_fascia_eta, età from 
-(select distinct età from istat_landing.lt_denunce_delitti);
 
-create table if not exists dim_indicatore as 
-select row_number() over() as ids_indicatore, indicatore from
-(select distinct indicatore from istat_landing.lt_denunce_delitti);
+-- crea dim_regioni (se preferisci da mapping, tieni questa versione)
+DROP TABLE IF EXISTS istat_transformation.dim_regioni;
+CREATE TABLE istat_transformation.dim_regioni AS
+SELECT row_number() OVER (ORDER BY regione) AS ids_regione,
+       regione
+FROM (
+  SELECT DISTINCT regione
+  FROM istat_transformation.mapping_regione_provincia
+  WHERE trim(coalesce(regione,'')) <> ''
+) t
+ORDER BY regione;
 
-create table if not exists dim_tipo_delitto as 
-select row_number() over() as ids_tipo_delitto, tipo_di_delitto from
-(select distinct tipo_di_delitto from istat_landing.lt_denunce_delitti);
 
-set search_path to istat_dwh;
+-- crea fact_denunce_delitti (usa dim_fascia_eta)
+DROP TABLE IF EXISTS istat_dwh.fact_denunce_delitti;
+CREATE TABLE istat_dwh.fact_denunce_delitti AS
+SELECT
+  row_number() OVER (ORDER BY dd.time_period, dd.territorio) AS ids,
+  mpc.ids_provincia AS ids_provincia,
+  di.ids_indicatore,
+  dtd.ids_tipo_delitto,
+  ds.ids_sesso,
+  dfe.ids_eta AS ids_fascia_eta,
+  da.ids_anno,
+  dd.osservazione AS numero_denunce,
+  NOW()::timestamp AS load_timestamp,
+  'lt_denunce_delitti' AS source_system
+FROM istat_landing.lt_denunce_delitti dd
+JOIN istat_transformation.mapping_regione_provincia mpc ON mpc.regione = dd.territorio
+JOIN istat_transformation.dim_indicatore di ON di.indicatore = dd.indicatore
+JOIN istat_transformation.dim_tipo_delitto dtd ON dtd.tipo_di_delitto = dd.tipo_di_delitto
+JOIN istat_transformation.dim_sesso ds ON ds.sesso = dd.sesso
+JOIN istat_transformation.dim_fascia_eta dfe ON dfe.eta = dd.eta
+JOIN istat_transformation.dim_anno da ON da.time_period = dd.time_period
+ORDER BY ids;
 
-create table if not exists fact_denunce_delitti as
-select row_number() over() as ids, ids_territorio, ids_indicatore, ids_tipo_delitto, ids_sesso, ids_fascia_eta, ids_anno, osservazione as numero_denunce
-from istat_landing.lt_denunce_delitti dd
-join istat_transformation.mapping_regione_provincia mpc on mpc.regione=dd.territorio
-join istat_transformation.dim_indicatore di on di.indicatore=dd.indicatore
-join istat_transformation.dim_tipo_delitto dtd on dtd.tipo_di_delitto=dd.tipo_di_delitto
-join istat_transformation.dim_sesso ds on ds.sesso=dd.sesso
-join istat_transformation.dim_fascia_eta dfe on dfe.età=dd.età
-join istat_transformation.dim_anno da on da.time_period=dd.time_period
-order by ids asc;
 
-set search_path to istat_transformation;
+-- crea fact_chiamate (usa dim_regioni che abbiamo creato dalla mapping)
+DROP TABLE IF EXISTS istat_dwh.fact_chiamate;
+CREATE TABLE istat_dwh.fact_chiamate AS
+SELECT
+  row_number() OVER (ORDER BY lv.time_period, lv.territorio) AS ids,
+  dr.ids_regione,
+  ds.ids_sesso,
+  mc.ids_motivi_chiamata,
+  da.ids_anno,
+  lv.osservazione AS numero_chiamate,
+  NOW()::timestamp AS load_timestamp,
+  'lt_chiamate_vittime' AS source_system
+FROM istat_landing.lt_chiamate_vittime lv
+JOIN istat_transformation.dim_regioni dr ON lv.territorio = dr.regione
+JOIN istat_transformation.dim_sesso ds ON ds.sesso = lv.sesso
+JOIN istat_transformation.dim_motivi_chiamata mc ON mc.motivi_della_chiamata = lv.motivi_della_chiamata
+JOIN istat_transformation.dim_anno da ON da.time_period = lv.time_period
+ORDER BY ids;
 
-create table if not exists dim_nazione (ids_nazione integer, nazione varchar(3000));
 
-insert into dim_nazione (ids_nazione, nazione) values (1,'Italia'), (2,'Estero');
+-- correggi il drop table / create del fact_condanne_reati_sesso_tot
+DROP TABLE IF EXISTS istat_dwh.fact_condanne_reati_sesso_tot;
+CREATE TABLE istat_dwh.fact_condanne_reati_sesso_tot AS
+SELECT
+  dr.ids_regione,
+  l.territorio,
+  l.osservazione AS tot_condanne,
+  da.ids_anno,
+  l.time_period AS anno,
+  dtr.ids_reato,
+  ds.ids_sesso,
+  l.sesso,
+  NOW()::timestamp AS load_timestamp,
+  'lt_condanne_reati_violenti_sesso_reg' AS source_system
+FROM istat_landing.lt_condanne_reati_violenti_sesso_reg l
+LEFT JOIN istat_transformation.dim_regioni dr
+  ON trim(lower(l.territorio)) = trim(lower(dr.regione))
+LEFT JOIN istat_transformation.dim_anno da
+  ON l.time_period = da.time_period
+LEFT JOIN istat_transformation.dim_tipo_reato dtr
+  ON trim(lower(l.tipo_di_reato)) = trim(lower(dtr.tipo_di_reato))
+LEFT JOIN istat_transformation.dim_sesso ds
+  ON trim(lower(l.sesso)) = trim(lower(ds.sesso));
 
-drop table if exists dim_regioni;
-create table if not exists dim_regioni as
-select row_number() over(order by territorio) as ids_regione, territorio as regione from
-(select distinct territorio from istat_landing.lt_chiamate_vittime where
-territorio in ('Marche', 'Sicilia', 'Valle d''Aosta / Vallée d''Aoste', 'Basilicata', 'Abruzzo', 'Piemonte', 'Toscana',
-'Lazio', 'Sardegna', 'Liguria', 'Lombardia', 'Campania', 'Puglia', 'Friuli-Venezia Giulia', 'Molise', 'Umbria',
-'Veneto', 'Trentino Alto Adige / Südtirol', 'Calabria', 'Emilia-Romagna'))
-order by regione asc;
 
-set search_path to dwh_progettoandromeda;
-
-create table if not exists fact_chiamate as
-select row_number() over() as ids, ids_regione, ids_sesso, ids_motivi_chiamata, ids_anno, osservazione as numero_chiamate, 
-now() as load_timestamp, 'landing' as source_system
-from istat_landing.lt_chiamate_vittime lv
-join istat_transformation.dim_regioni dr on lv.territorio=dr.regione
-join istat_transformation.dim_sesso ds on ds.sesso=lv.sesso
-join istat_transformation.dim_motivi_chiamata mc on mc.motivi_della_chiamata=lv.motivi_della_chiamata
-join istat_transformation.dim_anno da on da.time_period=lv.time_period
-order by ids asc;
+-- crea fact_condanne_eta_sesso (usa dim_fascia_eta)
+DROP TABLE IF EXISTS istat_dwh.fact_condanne_eta_sesso;
+CREATE TABLE istat_dwh.fact_condanne_eta_sesso AS
+SELECT
+  dr.ids_regione,
+  l.territorio,
+  da.ids_anno,
+  l.time_period AS anno,
+  ds.ids_sesso,
+  l.sesso,
+  dea.ids_eta,
+  l.eta_del_condannato_al_momento_del_reato AS eta,
+  dtr.ids_reato,
+  l.tipo_di_reato,
+  COALESCE(l.numero_condanne, 0) AS numero_condanne,
+  NOW()::timestamp AS load_timestamp,
+  'lt_condanne_eta_sesso' AS source_system
+FROM istat_landing.lt_condanne_eta_sesso l
+LEFT JOIN istat_transformation.dim_regioni dr
+  ON lower(trim(l.territorio)) = lower(trim(dr.regione))
+LEFT JOIN istat_transformation.dim_anno da
+  ON l.time_period = da.time_period
+LEFT JOIN istat_transformation.dim_sesso ds
+  ON lower(trim(l.sesso)) = lower(trim(ds.sesso))
+LEFT JOIN istat_transformation.dim_fascia_eta dea
+  ON lower(trim(l.eta_del_condannato_al_momento_del_reato)) = lower(trim(coalesce(dea.eta, '')))
+LEFT JOIN istat_transformation.dim_tipo_reato dtr
+  ON lower(trim(l.tipo_di_reato)) = lower(trim(dtr.tipo_di_reato))
+WHERE lower(trim(coalesce(l.sesso,''))) <> 'totale'
+  AND trim(coalesce(l.territorio,'')) <> ''
+  AND NOT (
+    lower(trim(l.territorio)) IN ('italia','estero','sud','nord-est','nord-ovest','centro','isole')
+    OR lower(trim(l.territorio)) LIKE 'provincia autonoma%'
+  );
