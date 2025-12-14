@@ -7,7 +7,7 @@ set search_path to istat_transformation;
 
 drop table if exists dim_territorio;
 
-create table if not exists dim_territorio as select row_number() over() as ids_territorio, territorio from (select distinct territorio from istat_landing.lt_vittime);
+create table if not exists dim_territorio as select row_number() over() as ids_territorio, territorio from (select distinct territorio from istat_landing.lt_chiamate_vittime);
 
 
 -- creo dim_sesso usando mio codice e fonte Aa 
@@ -22,14 +22,13 @@ sesso,
 NOW() as load_timestamp,
 'Landing' as source_system
 from  
-(select distinct sesso
-from select distinct sesso from istat_landing.lt_chiamate_vittime
+(select distinct sesso from istat_landing.lt_chiamate_vittime
 );
 
 /*
 drop table if exists dim_sesso;
 
-create table if not exists dim_sesso as select row_number() over() as ids_sesso, sesso from (select distinct sesso from istat_landing.lt_vittime); 
+create table if not exists dim_sesso as select row_number() over() as ids_sesso, sesso from (select distinct sesso from istat_landing.lt_chiamate_vittime); 
 */
 
 drop table if exists dim_motivi_chiamata;
@@ -38,7 +37,7 @@ create table if not exists dim_motivi_chiamata as select row_number() over() as 
 (select distinct motivi_della_chiamata from istat_landing.lt_chiamate_vittime);
 
 -- commento codice Aa
--- create table if not exists dim_anno as select row_number() over() as ids_anno, time_period from (select distinct time_period from istat_landing.lt_vittime);
+-- create table if not exists dim_anno as select row_number() over() as ids_anno, time_period from (select distinct time_period from istat_landing.lt_chiamate_vittime);
 
 -- inserisco mio codice ndAo
 
@@ -106,7 +105,7 @@ set search_path to istat_dwh;
 
 create table if not exists fact_vittime as
 select row_number() over() as ids, ids_territorio, ids_sesso, ids_motivi_chiamata, ids_anno, osservazione as numero_chiamate
-from istat_landing.lt_vittime lv
+from istat_landing.lt_chiamate_vittime lv
 join istat_transformation.dim_territorio dt on dt.territorio=lv.territorio
 join istat_transformation.dim_sesso ds on ds.sesso=lv.sesso
 join istat_transformation.dim_motivi_chiamata mc on mc.motivi_della_chiamata=lv.motivi_della_chiamata
