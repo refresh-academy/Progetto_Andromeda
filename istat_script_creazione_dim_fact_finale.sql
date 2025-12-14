@@ -44,6 +44,20 @@ create table if not exists dim_motivi_chiamata as select row_number() over() as 
 
 -- inserisco mio codice ndAo
 
+-- dim_fascia_eta
+
+drop table if exists dim_fascia_eta;
+
+create table if not exists dim_fascia_eta as
+select 
+row_number() over(order by eta) as ids_eta, 
+eta,
+NOW()::timestamp as load_timestamp,
+'Landing' as source_system
+from
+(select distinct eta from istat_landing.lt_denunce_delitti
+order by eta);
+
 -- per la dim_anno creo con una union
 
 drop table if exists istat_transformation.dim_anno;
@@ -119,7 +133,7 @@ FROM (
   FROM (VALUES
     ('Agrigento','Sicilia'),
     ('Alessandria','Piemonte'),
-    ('Aosta','Valle d''Aosta / Vallée d''Aoste'),
+    ('Aosta','Valle d''Aosta / Vallée d''Aoste'), 
     ('Arezzo','Toscana'),
     ('Ascoli Piceno','Marche'),
     ('Asti','Piemonte'),
@@ -217,7 +231,6 @@ FROM (
 ORDER BY provincia;
 
 
-
 -- FINE CODICE PROVINCE
 
 
@@ -254,7 +267,7 @@ set search_path to istat_dwh;
 create table if not exists fact_denunce_delitti as
 select row_number() over() as ids, ids_territorio, ids_indicatore, ids_tipo_delitto, ids_sesso, ids_fascia_eta, ids_anno, osservazione as numero_denunce
 from istat_landing.lt_denunce_delitti dd
-join istat_transformation.mapping_città_regione mpc on mpc.territorio=dd.territorio
+join istat_transformation.mapping_regione_provincia mpc on mpc.regione=dd.territorio
 join istat_transformation.dim_indicatore di on di.indicatore=dd.indicatore
 join istat_transformation.dim_tipo_delitto dtd on dtd.tipo_di_delitto=dd.tipo_di_delitto
 join istat_transformation.dim_sesso ds on ds.sesso=dd.sesso
