@@ -1,4 +1,3 @@
--- diagnostics_checks.sql
 -- Script di controlli/diagnostica per i landing, le dimensioni e i fact.
 -- Esegui nell'ordine. Ogni blocco è commentato; adatta gli schemi/nome tabelle se necessario.
 
