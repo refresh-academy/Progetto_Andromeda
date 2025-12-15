@@ -113,9 +113,9 @@ from (
     select distinct trim(eta) as eta, 'lt_denunce_delitti' as source
     from istat_landing.lt_denunce_delitti
     where trim(coalesce(eta, '')) <> ''
-  ) x
+  ) t
   group by eta
-) t
+) t1
 order by eta;
 
 
