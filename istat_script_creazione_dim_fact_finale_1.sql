@@ -31,8 +31,8 @@ CREATE TABLE istat_transformation.dim_nazione (
 INSERT INTO istat_transformation.dim_nazione (ids_nazione, nazione, load_timestamp, source_system) VALUES
   (1, 'Italia', NOW()::timestamp, 'a mano'),
   (2, 'Estero', NOW()::timestamp, 'a mano');
--- dim_indicatore
 
+-- dim_indicatore
 drop table if exists istat_transformation.dim_indicatore;
 create table istat_transformation.dim_indicatore as
 select
@@ -108,7 +108,7 @@ from (
     from istat_landing.lt_condanne_eta_sesso
     where trim(coalesce(eta_del_condannato_al_momento_del_reato, '')) <> ''
 
-    union all
+    union --all
 
     select distinct trim(eta) as eta, 'lt_denunce_delitti' as source
     from istat_landing.lt_denunce_delitti
@@ -157,7 +157,7 @@ from (
     from istat_landing.lt_condanne_eta_sesso
     where trim(coalesce(tipo_di_reato, '')) <> ''
 
-    union all
+    union --all
 
     select distinct trim(tipo_di_reato) as tipo_di_reato, 'lt_condanne_reati_violenti_sesso_reg' as source
     from istat_landing.lt_condanne_reati_violenti_sesso_reg
@@ -220,9 +220,10 @@ INSERT INTO istat_transformation.mapping_regione_area (regione, nome_area) VALUE
   ('Sardegna','Isole'),
   -- voci speciali
   ('Italia','Italia'),
-  ('Non indicato','Non indicato'),
+  ('Non indicato','Non indicato')
   -- non so se serva metterle qui
-  ('valle d''aosta / vallée d''aoste','Nord-ovest');
+  --('valle d''aosta / vallée d''aoste','Nord-ovest')
+  ;
 
 
 -- per usare la mapping quando carico il fact_chiamate
@@ -381,14 +382,16 @@ join istat_transformation.dim_anno da on da.time_period = lv.time_period
 order by ids;
 
 
--- crea dim_eta e altre dim locali in transformation sono già create; qui non duplicare
+-- crea dim_eta e altre dim locali in transformation sono già create; qui non duplica
 
 
 -- crea dim_regioni (se preferisci da mapping, tieni questa versione)
 drop table if exists istat_transformation.dim_regioni;
 create table istat_transformation.dim_regioni as
 select row_number() over (order by regione) as ids_regione,
-       regione
+       regione,
+        now()::timestamp as load_timestamp,
+        'mapping_regione_provincia' as source_system
 from (
   select distinct regione
   from istat_transformation.mapping_regione_provincia
@@ -447,8 +450,12 @@ join istat_transformation.dim_motivi_chiamata mc on mc.motivi_della_chiamata = l
 join istat_transformation.dim_anno da on da.time_period = lv.time_period
 order by ids;
 
+---------------
+-- da rivere quale usare
+---------------
 
 
+/*
 create table if not exists istat_dwh.fact_condanne_reati_sesso_tot as
 select row_number() over() as 
 	ids, 
@@ -456,16 +463,20 @@ select row_number() over() as
 	ids_reato, 
 	ids_sesso,  
 	ids_anno, 
-	osservazione as numero_condanne
+	osservazione as numero_condanne,
+  now()::timestamp as load_timestamp,
+  'lt_condanne_reati_violenti_sesso_reg' as source_system
 from istat_landing.lt_condanne_reati_violenti_sesso_reg crv
 join istat_transformation.dim_nazione itdn on itdn.nazione=crv.territorio
 join istat_transformation.dim_tipo_reato dtr on dtr.tipo_di_reato=crv.tipo_di_reato
 join istat_transformation.dim_sesso ds on ds.sesso=crv.sesso
 join istat_transformation.dim_anno da on da.time_period=crv.time_period
 order by ids asc;
+*/
 
 
--- correggi il drop table / create del fact_condanne_reati_sesso_tot
+--  create del fact_condanne_reati_sesso_tot
+
 drop table if exists istat_dwh.fact_condanne_reati_sesso_tot;
 create table istat_dwh.fact_condanne_reati_sesso_tot as
 select
@@ -491,8 +502,8 @@ left join istat_transformation.dim_sesso ds
 
 
 -- crea fact_condanne_eta_sesso (usa dim_fascia_eta)
-drop table if exists istat_dwh.fact_condanne_eta_sesso;
-create table istat_dwh.fact_condanne_eta_sesso as
+drop table if exists istat_dwh.fact_condanne_reati_eta_sesso;
+create table istat_dwh.fact_condanne_reati_eta_sesso as
 select
   dr.ids_regione,
   l.territorio,
@@ -525,6 +536,9 @@ where lower(trim(coalesce(l.sesso,''))) <> 'totale'
     or lower(trim(l.territorio)) like 'provincia autonoma%'
   );
 
+/*
 select count(*)	from istat_dwh.fact_condanne_reati_sesso_tot fcrst
 union
-select count(*) from istat_dwh.fact_condanne_eta_sesso fces 
+select count(*) from istat_dwh.fact_condanne_eta_sesso fces
+*/
+
