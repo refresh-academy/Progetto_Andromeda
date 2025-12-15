@@ -8,8 +8,8 @@ set search_path to istat_transformation;
 -- creazione dimensioni in transformation schema
 
 -- dim_territorio (da lt_chiamate_vittime)
-drop table if exists istat_transformation.dim_territorio;
-create table istat_transformation.dim_territorio as
+drop table if exists dwh_progettoandromeda.dim_territorio;
+create table dwh_progettoandromeda.dim_territorio as
 select row_number() over (order by territorio) as ids_territorio,
        territorio
 from (
@@ -21,16 +21,16 @@ order by territorio;
 ---------------
 -- dim_nazione
 ---------------
-DROP TABLE IF EXISTS istat_transformation.dim_nazione;
+DROP TABLE IF EXISTS dwh_progettoandromeda.dim_nazione;
 
-CREATE TABLE istat_transformation.dim_nazione (
+CREATE TABLE dwh_progettoandromeda.dim_nazione (
   ids_nazione integer PRIMARY KEY,
   nazione varchar NOT NULL,
   load_timestamp timestamp without time zone,
   source_system varchar
 );
 
-INSERT INTO istat_transformation.dim_nazione (ids_nazione, nazione, load_timestamp, source_system) VALUES
+INSERT INTO dwh_progettoandromeda.dim_nazione (ids_nazione, nazione, load_timestamp, source_system) VALUES
   (1, 'Italia', NOW()::timestamp, 'a mano'),
   (2, 'Estero', NOW()::timestamp, 'a mano');
 
@@ -38,8 +38,8 @@ INSERT INTO istat_transformation.dim_nazione (ids_nazione, nazione, load_timesta
 -- dim_indicatore
 -----------------
 
-drop table if exists istat_transformation.dim_indicatore;
-create table istat_transformation.dim_indicatore as
+drop table if exists dwh_progettoandromeda.dim_indicatore;
+create table dwh_progettoandromeda.dim_indicatore as
 select
 	row_number() over (order by indicatore) as ids_indicatore,
 	indicatore,
@@ -53,8 +53,8 @@ where trim(coalesce(indicatore, '')) <> ''
 order by indicatore;
 
 -- crea dim_tipo_delitto
-drop table if exists istat_transformation.dim_tipo_delitto;
-create table istat_transformation.dim_tipo_delitto as
+drop table if exists dwh_progettoandromeda.dim_tipo_delitto;
+create table dwh_progettoandromeda.dim_tipo_delitto as
 select
   row_number() over (order by tipo_di_delitto) as ids_tipo_delitto,
   tipo_di_delitto,
@@ -68,8 +68,8 @@ from (
 order by tipo_di_delitto;
 
 -- dim_sesso
-drop table if exists istat_transformation.dim_sesso;
-create table istat_transformation.dim_sesso as
+drop table if exists dwh_progettoandromeda.dim_sesso;
+create table dwh_progettoandromeda.dim_sesso as
 select
   row_number() over (order by sesso) as ids_sesso,
   sesso,
@@ -84,8 +84,8 @@ order by sesso;
 
 
 -- dim_motivi_chiamata
-drop table if exists istat_transformation.dim_motivi_chiamata;
-create table istat_transformation.dim_motivi_chiamata as
+drop table if exists dwh_progettoandromeda.dim_motivi_chiamata;
+create table dwh_progettoandromeda.dim_motivi_chiamata as
 select row_number() over (order by motivi_della_chiamata) as ids_motivi_chiamata,
        motivi_della_chiamata
 from (
@@ -96,11 +96,11 @@ from (
 order by motivi_della_chiamata;
 
 -------------------------------------------------------
--- dim_fascia_eta (unificata, proveniente da due landing)
+-- dim_fascia_eta_istat_istat (unificata, proveniente da due landing)
 -------------------------------------------------------
 
-drop table if exists istat_transformation.dim_fascia_eta;
-create table istat_transformation.dim_fascia_eta as
+drop table if exists dwh_progettoandromeda.dim_fascia_eta_istat_istat;
+create table dwh_progettoandromeda.dim_fascia_eta_istat_istat as
 select
   row_number() over (order by eta) as ids_eta,
   eta,
@@ -127,8 +127,8 @@ order by eta;
 
 
 -- dim_anno (unisce anni da più landing)
-drop table if exists istat_transformation.dim_anno;
-create table istat_transformation.dim_anno as
+drop table if exists dwh_progettoandromeda.dim_anno;
+create table dwh_progettoandromeda.dim_anno as
 select
   row_number() over (order by time_period) as ids_anno,
   time_period,
@@ -148,8 +148,8 @@ order by time_period;
 
 
 -- dim_tipo_reato (unificata e traccia sorgente)
-drop table if exists istat_transformation.dim_tipo_reato;
-create table istat_transformation.dim_tipo_reato as
+drop table if exists dwh_progettoandromeda.dim_tipo_reato;
+create table dwh_progettoandromeda.dim_tipo_reato as
 select
   row_number() over (order by tipo_di_reato) as ids_reato,
   tipo_di_reato,
@@ -175,8 +175,8 @@ from (
 order by tipo_di_reato;
 
 -- Crea dim_area (con lista a mano)
-DROP TABLE IF EXISTS istat_transformation.dim_area;
-CREATE TABLE istat_transformation.dim_area AS
+DROP TABLE IF EXISTS dwh_progettoandromeda.dim_area;
+CREATE TABLE dwh_progettoandromeda.dim_area AS
 SELECT
   row_number() OVER (ORDER BY nome_area) AS ids_area,
   nome_area,
@@ -194,14 +194,14 @@ FROM (
 ) v(nome_area);
 
 -- mapping regione -> area 
-DROP TABLE IF EXISTS istat_transformation.mapping_regione_area;
-CREATE TABLE istat_transformation.mapping_regione_area (
+DROP TABLE IF EXISTS dwh_progettoandromeda.mapping_regione_area;
+CREATE TABLE dwh_progettoandromeda.mapping_regione_area (
   regione varchar,
   nome_area varchar,
   load_timestamp timestamp,
   source_system varchar
 );
-INSERT INTO istat_transformation.mapping_regione_area (regione, nome_area, load_timestamp, source_system) VALUES
+INSERT INTO dwh_progettoandromeda.mapping_regione_area (regione, nome_area, load_timestamp, source_system) VALUES
   -- Nord-ovest
   ('Piemonte','Nord-ovest', NOW(), 'a mano'),
   ('Valle d''Aosta / Vallée d''Aoste','Nord-ovest', NOW(), 'a mano'),
@@ -236,14 +236,14 @@ INSERT INTO istat_transformation.mapping_regione_area (regione, nome_area, load_
 
 
 -- per usare la mapping quando carico il fact_chiamate
--- JOIN istat_transformation.view_region_to_area vra ON lower(trim(lv.territorio)) = lower(trim(vra.regione))
+-- JOIN dwh_progettoandromeda.view_region_to_area vra ON lower(trim(lv.territorio)) = lower(trim(vra.regione))
 -- poi usa vra.ids_area come foreign key nella tabella fact (o faccio join su dim_area tramite nome_area)
 -- qui non sono certo xche' e' tardi ed ho consultato copilot
 
 
 -- mapping province -> regione
-drop table if exists istat_transformation.mapping_regione_provincia;
-create table istat_transformation.mapping_regione_provincia as
+drop table if exists dwh_progettoandromeda.mapping_regione_provincia;
+create table dwh_progettoandromeda.mapping_regione_provincia as
 select
   row_number() over (order by provincia) as ids_provincia,
   provincia,
@@ -367,13 +367,13 @@ order by provincia;
 -- fine transformation schema
 
 
--- ora creo schema dwh e i fact (istat_dwh per chiarezza)
-drop schema if exists istat_dwh cascade;
-create schema istat_dwh;
+-- ora creo schema dwh e i fact (dwh_progettoandromeda per chiarezza)
+drop schema if exists dwh_progettoandromeda cascade;
+create schema dwh_progettoandromeda;
 
--- crea fact_vittime nello schema istat_dwh
-drop table if exists istat_dwh.fact_vittime;
-create table istat_dwh.fact_vittime as
+-- crea fact_vittime nello schema dwh_progettoandromeda
+drop table if exists dwh_progettoandromeda.fact_vittime;
+create table dwh_progettoandromeda.fact_vittime as
 select
   row_number() over (order by lv.time_period, lv.territorio) as ids,
   dt.ids_territorio,
@@ -384,13 +384,13 @@ select
   now()::timestamp as load_timestamp,
   'lt_chiamate_vittime' as source_system
 from istat_landing.lt_chiamate_vittime lv
-join istat_transformation.dim_territorio dt on dt.territorio = lv.territorio
-join istat_transformation.dim_sesso ds on ds.sesso = lv.sesso
-join istat_transformation.dim_motivi_chiamata mc on mc.motivi_della_chiamata = lv.motivi_della_chiamata
-join istat_transformation.dim_anno da on da.time_period = lv.time_period
+join dwh_progettoandromeda.dim_territorio dt on dt.territorio = lv.territorio
+join dwh_progettoandromeda.dim_sesso ds on ds.sesso = lv.sesso
+join dwh_progettoandromeda.dim_motivi_chiamata mc on mc.motivi_della_chiamata = lv.motivi_della_chiamata
+join dwh_progettoandromeda.dim_anno da on da.time_period = lv.time_period
 order by ids;
 
-/* select count(*) from istat_dwh.fact_vittime lft
+/* select count(*) from dwh_progettoandromeda.fact_vittime lft
 union all
 select count(*) from istat_landing.lt_chiamate_vittime lcv
 */ 
@@ -399,23 +399,23 @@ select count(*) from istat_landing.lt_chiamate_vittime lcv
 
 
 -- crea dim_regioni (se preferisci da mapping, tieni questa versione)
-drop table if exists istat_transformation.dim_regioni;
-create table istat_transformation.dim_regioni as
+drop table if exists dwh_progettoandromeda.dim_regioni;
+create table dwh_progettoandromeda.dim_regioni as
 select row_number() over (order by regione) as ids_regione,
        regione,
         now()::timestamp as load_timestamp,
         'mapping_regione_provincia' as source_system
 from (
   select distinct regione
-  from istat_transformation.mapping_regione_provincia
+  from dwh_progettoandromeda.mapping_regione_provincia
   where trim(coalesce(regione,'')) <> ''
 ) t
 order by regione;
 
 
-DROP TABLE IF EXISTS istat_dwh.fact_denunce_delitti;
+DROP TABLE IF EXISTS dwh_progettoandromeda.fact_denunce_delitti;
 
-CREATE TABLE istat_dwh.fact_denunce_delitti AS
+CREATE TABLE dwh_progettoandromeda.fact_denunce_delitti AS
 SELECT
   row_number() OVER (ORDER BY dd.time_period, dd.territorio) AS ids,
   dr.ids_regione AS ids_regione,
@@ -428,21 +428,21 @@ SELECT
   NOW()::timestamp AS load_timestamp,
   'lt_denunce_delitti' AS source_system
 FROM istat_landing.lt_denunce_delitti dd
-left JOIN istat_transformation.dim_regioni dr
+left JOIN dwh_progettoandromeda.dim_regioni dr
   ON lower(trim(dr.regione)) = lower(trim(dd.territorio))
-left JOIN istat_transformation.dim_indicatore di
+left JOIN dwh_progettoandromeda.dim_indicatore di
   ON lower(trim(di.indicatore)) = lower(trim(dd.indicatore))
-left JOIN istat_transformation.dim_tipo_delitto dtd
+left JOIN dwh_progettoandromeda.dim_tipo_delitto dtd
   ON lower(trim(dtd.tipo_di_delitto)) = lower(trim(dd.tipo_di_delitto))
-JOIN istat_transformation.dim_sesso ds
+JOIN dwh_progettoandromeda.dim_sesso ds
   ON lower(trim(ds.sesso)) = lower(trim(dd.sesso))
-JOIN istat_transformation.dim_fascia_eta dfe
-  ON lower(trim(dfe.eta)) = lower(trim(dd.età))
-JOIN istat_transformation.dim_anno da
+JOIN dwh_progettoandromeda.dim_fascia_eta_istat_istat dfe
+  ON lower(trim(dfe.eta)) = lower(trim(dd.eta))
+JOIN dwh_progettoandromeda.dim_anno da
   ON da.time_period = dd.time_period
 ORDER BY ids;
 
--- select count(*) from istat_dwh.fact_denunce_delitti;
+-- select count(*) from dwh_progettoandromeda.fact_denunce_delitti;
 
 
 --------
@@ -450,8 +450,8 @@ ORDER BY ids;
 --------
 
 -- crea fact_chiamate (usa dim_regioni che abbiamo creato dalla mapping)
-drop table if exists istat_dwh.fact_chiamate;
-create table istat_dwh.fact_chiamate as
+drop table if exists dwh_progettoandromeda.fact_chiamate;
+create table dwh_progettoandromeda.fact_chiamate as
 select
   row_number() over (order by lv.time_period, lv.territorio) as ids,
   dr.ids_regione,
@@ -462,15 +462,15 @@ select
   now()::timestamp as load_timestamp,
   'lt_chiamate_vittime' as source_system
 from istat_landing.lt_chiamate_vittime lv
-join istat_transformation.dim_regioni dr on lv.territorio = dr.regione
-join istat_transformation.dim_sesso ds on ds.sesso = lv.sesso
-join istat_transformation.dim_motivi_chiamata mc on mc.motivi_della_chiamata = lv.motivi_della_chiamata
-join istat_transformation.dim_anno da on da.time_period = lv.time_period
+join dwh_progettoandromeda.dim_regioni dr on lv.territorio = dr.regione
+join dwh_progettoandromeda.dim_sesso ds on ds.sesso = lv.sesso
+join dwh_progettoandromeda.dim_motivi_chiamata mc on mc.motivi_della_chiamata = lv.motivi_della_chiamata
+join dwh_progettoandromeda.dim_anno da on da.time_period = lv.time_period
 order by ids;
 
 
 /* 
-select count(*) from istat_dwh.fact_chiamate
+select count(*) from dwh_progettoandromeda.fact_chiamate
 union all
 select count(*) from istat_landing.lt_chiamate_vittime lcv ;
 */
@@ -481,7 +481,7 @@ select count(*) from istat_landing.lt_chiamate_vittime lcv ;
 
 
 /*
-create table if not exists istat_dwh.fact_condanne_reati_sesso_tot as
+create table if not exists dwh_progettoandromeda.fact_condanne_reati_sesso_tot as
 select row_number() over() as 
 	ids, 
 	ids_nazione,
@@ -492,18 +492,18 @@ select row_number() over() as
   now()::timestamp as load_timestamp,
   'lt_condanne_reati_violenti_sesso_reg' as source_system
 from istat_landing.lt_condanne_reati_violenti_sesso_reg crv
-join istat_transformation.dim_nazione itdn on itdn.nazione=crv.territorio
-join istat_transformation.dim_tipo_reato dtr on dtr.tipo_di_reato=crv.tipo_di_reato
-join istat_transformation.dim_sesso ds on ds.sesso=crv.sesso
-join istat_transformation.dim_anno da on da.time_period=crv.time_period
+join dwh_progettoandromeda.dim_nazione itdn on itdn.nazione=crv.territorio
+join dwh_progettoandromeda.dim_tipo_reato dtr on dtr.tipo_di_reato=crv.tipo_di_reato
+join dwh_progettoandromeda.dim_sesso ds on ds.sesso=crv.sesso
+join dwh_progettoandromeda.dim_anno da on da.time_period=crv.time_period
 order by ids asc;
 */
 
 
 --  create del fact_condanne_reati_sesso_tot
 
-drop table if exists istat_dwh.fact_condanne_reati_sesso_tot;
-create table istat_dwh.fact_condanne_reati_sesso_tot as
+drop table if exists dwh_progettoandromeda.fact_condanne_reati_sesso_tot;
+create table dwh_progettoandromeda.fact_condanne_reati_sesso_tot as
 select
   dr.ids_regione,
   l.territorio,
@@ -516,19 +516,19 @@ select
   now()::timestamp as load_timestamp,
   'lt_condanne_reati_violenti_sesso_reg' as source_system
 from istat_landing.lt_condanne_reati_violenti_sesso_reg l
-left join istat_transformation.dim_regioni dr
+left join dwh_progettoandromeda.dim_regioni dr
   on trim(lower(l.territorio)) = trim(lower(dr.regione))
-left join istat_transformation.dim_anno da
+left join dwh_progettoandromeda.dim_anno da
   on l.time_period = da.time_period
-left join istat_transformation.dim_tipo_reato dtr
+left join dwh_progettoandromeda.dim_tipo_reato dtr
   on trim(lower(l.tipo_di_reato)) = trim(lower(dtr.tipo_di_reato))
-left join istat_transformation.dim_sesso ds
+left join dwh_progettoandromeda.dim_sesso ds
   on trim(lower(l.sesso)) = trim(lower(ds.sesso));
 
 
--- crea fact_condanne_eta_sesso (usa dim_fascia_eta)
-drop table if exists istat_dwh.fact_condanne_reati_eta_sesso;
-create table istat_dwh.fact_condanne_reati_eta_sesso as
+-- crea fact_condanne_eta_sesso (usa dim_fascia_eta_istat)
+drop table if exists dwh_progettoandromeda.fact_condanne_reati_eta_sesso;
+create table dwh_progettoandromeda.fact_condanne_reati_eta_sesso as
 select
   dr.ids_regione,
   l.territorio,
@@ -544,15 +544,15 @@ select
   now()::timestamp as load_timestamp,
   'lt_condanne_eta_sesso' as source_system
 from istat_landing.lt_condanne_eta_sesso l
-join istat_transformation.dim_regioni dr
+join dwh_progettoandromeda.dim_regioni dr
   on lower(trim(l.territorio)) = lower(trim(dr.regione))
-join istat_transformation.dim_anno da
+join dwh_progettoandromeda.dim_anno da
   on l.time_period = da.time_period
-join istat_transformation.dim_sesso ds
+join dwh_progettoandromeda.dim_sesso ds
   on lower(trim(l.sesso)) = lower(trim(ds.sesso))
-join istat_transformation.dim_fascia_eta dea
+join dwh_progettoandromeda.dim_fascia_eta_istat dea
   on lower(trim(l.eta_del_condannato_al_momento_del_reato)) = lower(trim(coalesce(dea.eta, '')))
-join istat_transformation.dim_tipo_reato dtr
+join dwh_progettoandromeda.dim_tipo_reato dtr
   on lower(trim(l.tipo_di_reato)) = lower(trim(dtr.tipo_di_reato))
 where lower(trim(coalesce(l.sesso,''))) <> 'totale'
   and trim(coalesce(l.territorio,'')) <> ''
@@ -562,8 +562,8 @@ where lower(trim(coalesce(l.sesso,''))) <> 'totale'
   );
 
 /*
-select count(*)	from istat_dwh.fact_condanne_reati_sesso_tot fcrst
+select count(*)	from dwh_progettoandromeda.fact_condanne_reati_sesso_tot fcrst
 union
-select count(*) from istat_dwh.fact_condanne_reati_eta_sesso fces
+select count(*) from dwh_progettoandromeda.fact_condanne_reati_eta_sesso fces
 */
 
