@@ -437,7 +437,7 @@ left JOIN istat_transformation.dim_tipo_delitto dtd
 JOIN istat_transformation.dim_sesso ds
   ON lower(trim(ds.sesso)) = lower(trim(dd.sesso))
 JOIN istat_transformation.dim_fascia_eta dfe
-  ON lower(trim(dfe.eta)) = lower(trim(dd.eta))
+  ON lower(trim(dfe.eta)) = lower(trim(dd.età))
 JOIN istat_transformation.dim_anno da
   ON da.time_period = dd.time_period
 ORDER BY ids;
